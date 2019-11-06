@@ -18,7 +18,7 @@
  */
 
 import {
-  ButtonLink,
+  Button,
   COLOR,
   CheckIcon,
   ContainerXS,
@@ -33,7 +33,7 @@ import {
   RoundIconButton,
   Text,
 } from '@wireapp/react-ui-kit';
-import React, {useEffect, useState} from 'react';
+import React, {useState} from 'react';
 import {useIntl} from 'react-intl';
 import {connect} from 'react-redux';
 import {AnyAction, Dispatch} from 'redux';
@@ -43,6 +43,7 @@ import {actionRoot as ROOT_ACTIONS} from '../module/action/';
 import {BackendError} from '../module/action/BackendError';
 import {ValidationError} from '../module/action/ValidationError';
 import {RootState, bindActionCreators} from '../module/reducer';
+import * as AuthSelector from '../module/selector/AuthSelector';
 import * as InviteSelector from '../module/selector/InviteSelector';
 import * as LanguageSelector from '../module/selector/LanguageSelector';
 import {parseError, parseValidationErrors} from '../util/errorUtil';
@@ -52,17 +53,13 @@ import Page from './Page';
 interface Props extends React.HTMLProps<HTMLDivElement> {}
 
 const InitialInvite = ({
-  fetchSelf,
   invites,
   isFetching,
   inviteError,
   resetInviteErrors,
   invite,
+  isTeamFlow,
 }: Props & ConnectedProps & DispatchProps) => {
-  useEffect(() => {
-    fetchSelf();
-  }, []);
-
   const {formatMessage: _} = useIntl();
   const emailInput = React.useRef<HTMLInputElement>();
   const [enteredEmail, setEnteredEmail] = useState('');
@@ -91,11 +88,14 @@ const InitialInvite = ({
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     emailInput.current.value = emailInput.current.value.trim();
+    emailInput.current.focus();
     if (!emailInput.current.checkValidity()) {
       setError(ValidationError.handleValidationState('email', emailInput.current.validity));
     } else {
       try {
         await invite({email: emailInput.current.value});
+        setEnteredEmail('');
+        emailInput.current.value = '';
       } catch (error) {
         if (error.label) {
           switch (error.label) {
@@ -116,16 +116,18 @@ const InitialInvite = ({
           throw error;
         }
       }
-      setEnteredEmail('');
-      emailInput.current.value = '';
     }
-    emailInput.current.focus();
   };
 
   const resetErrors = (): void => {
     setError(null);
     resetInviteErrors();
   };
+
+  if (!isTeamFlow) {
+    onInviteDone();
+    return null;
+  }
 
   return (
     <Page>
@@ -150,6 +152,8 @@ const InitialInvite = ({
                   resetErrors();
                   setEnteredEmail(event.target.value);
                 }}
+                // Note: Curser issues when using controlled input
+                // value={enteredEmail}
                 ref={emailInput}
                 autoFocus
                 data-uie-name="enter-invite-email"
@@ -169,9 +173,9 @@ const InitialInvite = ({
         </div>
         <div>
           {invites.length ? (
-            <ButtonLink style={{margin: '0 auto -16px'}} onClick={onInviteDone} data-uie-name="do-next">
+            <Button onClick={onInviteDone} data-uie-name="do-next">
               {_(inviteStrings.nextButton)}
-            </ButtonLink>
+            </Button>
           ) : (
             <Link onClick={onInviteDone} data-uie-name="do-skip">
               {_(inviteStrings.skipForNow)}
@@ -188,6 +192,7 @@ const mapStateToProps = (state: RootState) => ({
   inviteError: InviteSelector.getError(state),
   invites: InviteSelector.getInvites(state),
   isFetching: InviteSelector.isFetching(state),
+  isTeamFlow: AuthSelector.isTeamFlow(state),
   language: LanguageSelector.getLanguage(state),
 });
 
@@ -195,7 +200,6 @@ type DispatchProps = ReturnType<typeof mapDispatchToProps>;
 const mapDispatchToProps = (dispatch: Dispatch<AnyAction>) =>
   bindActionCreators(
     {
-      fetchSelf: ROOT_ACTIONS.selfAction.fetchSelf,
       invite: ROOT_ACTIONS.invitationAction.invite,
       resetInviteErrors: ROOT_ACTIONS.invitationAction.resetInviteErrors,
     },

@@ -17,7 +17,7 @@
  *
  */
 
-import {LoginData, RegisterData} from '@wireapp/api-client/dist/commonjs/auth';
+import {LoginData, RegisterData, SendLoginCode} from '@wireapp/api-client/dist/commonjs/auth';
 import {ClientType} from '@wireapp/api-client/dist/commonjs/client/index';
 import {Account} from '@wireapp/core';
 import {LowDiskSpaceError} from '@wireapp/store-engine/dist/commonjs/engine/error/';
@@ -78,7 +78,7 @@ export class AuthAction {
           dispatch(AuthActionCreator.successfulLogin());
         })
         .catch(error => {
-          if (error.label === BackendError.LABEL.NEW_CLIENT || error.label === BackendError.LABEL.TOO_MANY_CLIENTS) {
+          if (error.label === BackendError.LABEL.TOO_MANY_CLIENTS) {
             dispatch(AuthActionCreator.successfulLogin());
           } else {
             if (error instanceof LowDiskSpaceError) {
@@ -88,6 +88,19 @@ export class AuthAction {
           }
           throw error;
         });
+    };
+  };
+
+  doSendPhoneLoginCode = (loginRequest: Omit<SendLoginCode, 'voice_call'>): ThunkAction => {
+    return async (dispatch, getState, {apiClient}) => {
+      dispatch(AuthActionCreator.startSendPhoneLoginCode());
+      try {
+        const {data} = await apiClient.auth.api.postLoginSend(loginRequest);
+        dispatch(AuthActionCreator.successfulSendPhoneLoginCode(data.expires_in));
+      } catch (error) {
+        dispatch(AuthActionCreator.failedSendPhoneLoginCode(error));
+        throw error;
+      }
     };
   };
 
@@ -109,7 +122,7 @@ export class AuthAction {
           dispatch(AuthActionCreator.successfulLogin());
         })
         .catch(error => {
-          if (error.label === BackendError.LABEL.NEW_CLIENT || error.label === BackendError.LABEL.TOO_MANY_CLIENTS) {
+          if (error.label === BackendError.LABEL.TOO_MANY_CLIENTS) {
             dispatch(AuthActionCreator.successfulLogin());
           } else {
             dispatch(AuthActionCreator.failedLogin(error));
@@ -199,11 +212,7 @@ export class AuthAction {
           dispatch(AuthActionCreator.successfulRegisterTeam(registration));
         })
         .catch(error => {
-          if (error.label === BackendError.LABEL.NEW_CLIENT) {
-            dispatch(AuthActionCreator.successfulRegisterTeam(registration));
-          } else {
-            dispatch(AuthActionCreator.failedRegisterTeam(error));
-          }
+          dispatch(AuthActionCreator.failedRegisterTeam(error));
           throw error;
         });
     };
@@ -233,11 +242,7 @@ export class AuthAction {
           dispatch(AuthActionCreator.successfulRegisterPersonal(registration));
         })
         .catch(error => {
-          if (error.label === BackendError.LABEL.NEW_CLIENT) {
-            dispatch(AuthActionCreator.successfulRegisterPersonal(registration));
-          } else {
-            dispatch(AuthActionCreator.failedRegisterPersonal(error));
-          }
+          dispatch(AuthActionCreator.failedRegisterPersonal(error));
           throw error;
         });
     };
@@ -267,11 +272,7 @@ export class AuthAction {
           dispatch(AuthActionCreator.successfulRegisterWireless(registrationData));
         })
         .catch(error => {
-          if (error.label === BackendError.LABEL.NEW_CLIENT) {
-            dispatch(AuthActionCreator.successfulRegisterWireless(registrationData));
-          } else {
-            dispatch(AuthActionCreator.failedRegisterWireless(error));
-          }
+          dispatch(AuthActionCreator.failedRegisterWireless(error));
           throw error;
         });
     };
